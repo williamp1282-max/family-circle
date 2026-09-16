@@ -10,7 +10,7 @@ function formatDate(isoString) {
     d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-export default function FamilyFeedClient({ familyId, initialPosts }) {
+export default function FamilyFeedClient({ familyId, initialPosts, currentUserId, isAdmin }) {
   const [posts, setPosts] = useState(initialPosts);
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState(null);
@@ -18,7 +18,21 @@ export default function FamilyFeedClient({ familyId, initialPosts }) {
   const [uploading, setUploading] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
   const fileInputRef = useRef(null);
+
+  async function handleDelete(postId) {
+    if (!confirm("Delete this post? This can't be undone.")) return;
+    setDeletingId(postId);
+    const res = await fetch(`/api/families/${familyId}/posts/${postId}`, { method: "DELETE" });
+    setDeletingId(null);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Could not delete that post.");
+      return;
+    }
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }
 
   function handleFileChange(e) {
     const selected = e.target.files?.[0];
@@ -75,7 +89,7 @@ export default function FamilyFeedClient({ familyId, initialPosts }) {
       }
 
       setPosts((prev) => [
-        { ...data.post, author: "You" },
+        { ...data.post, author: "You", user_id: currentUserId },
         ...prev,
       ]);
       resetForm();
@@ -126,17 +140,32 @@ export default function FamilyFeedClient({ familyId, initialPosts }) {
       {posts.length === 0 ? (
         <div className="card empty-state">No posts yet. Be the first to share something!</div>
       ) : (
-        posts.map((post) => (
-          <div key={post.id} className="post">
-            {post.image_url && <img src={post.image_url} alt={post.caption || "Family photo"} />}
-            <div className="post-body">
-              <div className="post-meta">
-                <span className="post-author">{post.author}</span> · {formatDate(post.created_at)}
+        posts.map((post) => {
+          const canDelete = isAdmin || post.user_id === currentUserId;
+          return (
+            <div key={post.id} className="post">
+              {post.image_url && <img src={post.image_url} alt={post.caption || "Family photo"} />}
+              <div className="post-body">
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div className="post-meta">
+                    <span className="post-author">{post.author}</span> · {formatDate(post.created_at)}
+                  </div>
+                  {canDelete && (
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: "2px 10px", fontSize: "0.8rem" }}
+                      onClick={() => handleDelete(post.id)}
+                      disabled={deletingId === post.id}
+                    >
+                      {deletingId === post.id ? "Deleting…" : "Delete"}
+                    </button>
+                  )}
+                </div>
+                {post.caption && <div>{post.caption}</div>}
               </div>
-              {post.caption && <div>{post.caption}</div>}
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

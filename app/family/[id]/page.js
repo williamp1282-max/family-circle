@@ -3,6 +3,7 @@ import { getSession } from "../../../lib/session";
 import { sql, ensureSchema } from "../../../lib/db";
 import TopBar from "../../components/TopBar";
 import FamilyFeedClient from "./FamilyFeedClient";
+import FamilyAdminPanel from "./FamilyAdminPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function FamilyPage({ params }) {
   if (!family) notFound();
 
   const postsResult = await sql`
-    SELECT p.id, p.caption, p.image_url, p.created_at, u.display_name AS author
+    SELECT p.id, p.user_id, p.caption, p.image_url, p.created_at, u.display_name AS author
     FROM posts p
     JOIN users u ON u.id = p.user_id
     WHERE p.family_id = ${familyId}
@@ -32,12 +33,14 @@ export default async function FamilyPage({ params }) {
   `;
 
   const membersResult = await sql`
-    SELECT u.display_name, fm.role
+    SELECT u.username, u.display_name, fm.role
     FROM family_members fm
     JOIN users u ON u.id = fm.user_id
     WHERE fm.family_id = ${familyId}
     ORDER BY fm.joined_at ASC
   `;
+
+  const isAdmin = family.role === "admin";
 
   return (
     <>
@@ -63,7 +66,20 @@ export default async function FamilyPage({ params }) {
           </div>
         </div>
 
-        <FamilyFeedClient familyId={family.id} initialPosts={postsResult.rows} />
+        <FamilyAdminPanel
+          familyId={family.id}
+          isAdmin={isAdmin}
+          initialMembers={membersResult.rows}
+          initialInviteCode={family.invite_code}
+          currentUsername={session.username}
+        />
+
+        <FamilyFeedClient
+          familyId={family.id}
+          initialPosts={postsResult.rows}
+          currentUserId={session.userId}
+          isAdmin={isAdmin}
+        />
       </div>
     </>
   );

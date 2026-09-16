@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
   }
 
   const result = await sql`
-    SELECT p.id, p.caption, p.image_url, p.created_at, u.display_name AS author
+    SELECT p.id, p.user_id, p.caption, p.image_url, p.created_at, u.display_name AS author
     FROM posts p
     JOIN users u ON u.id = p.user_id
     WHERE p.family_id = ${familyId}
